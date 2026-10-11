@@ -1,0 +1,87 @@
+package com.muse.localplayer.playback
+
+import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
+import com.muse.localplayer.MainActivity
+import com.muse.localplayer.R
+
+@SuppressLint("UnsafeOptInUsageError")
+class MusicPlaybackService : MediaSessionService() {
+    private var mediaSession: MediaSession? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        val channelId = playbackNotificationChannelId()
+        createPlaybackNotificationChannel(channelId)
+        setMediaNotificationProvider(MuseMediaNotificationProvider(this, channelId))
+
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+        val player = ExoPlayer.Builder(this)
+            .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+        val sessionActivity = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        mediaSession = MediaSession.Builder(this, player)
+            .setSessionActivity(sessionActivity)
+            .setPeriodicPositionUpdateEnabled(true)
+            .build()
+    }
+
+    private fun playbackNotificationChannelId(): String = "$packageName.playback"
+
+    private fun createPlaybackNotificationChannel(channelId: String) {
+        val channel = NotificationChannel(
+            channelId,
+            getString(R.string.playback_notification_channel),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = getString(R.string.playback_notification_description)
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+
+    override fun onTaskRemoved(rootIntent: android.content.Intent?) {
+        val player = mediaSession?.player
+        if (player?.playWhenReady != true || player.mediaItemCount == 0) {
+            stopSelf()
+        }
+    }
+
+    override fun onDestroy() {
+        // 幂等且异常安全：先释放 MediaSession，再释放 player，避免释放顺序竞态引发崩溃
+        val session = mediaSession
+        mediaSession = null
+        runCatching {
+            session?.let {
+                val player = it.player
+                it.release()
+                player.release()
+            }
+        }
+        super.onDestroy()
+    }
+
+}

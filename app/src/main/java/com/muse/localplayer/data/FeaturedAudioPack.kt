@@ -1,0 +1,104 @@
+package com.muse.localplayer.data
+
+import com.muse.localplayer.core.T
+
+/** All publisher-authored offline topics packaged in the current APK. */
+data class FeaturedAudioCatalog(
+    val topics: List<FeaturedAudioPack> = emptyList()
+) {
+    val activeFallback: FeaturedAudioPack?
+        get() = topics.firstOrNull()
+}
+
+/** One independently playable topic inside the APK assets directory. */
+data class FeaturedAudioPack(
+    val id: String = "default",
+    val rootAssetPath: String = "featured_audio",
+    val metadata: FeaturedPackMetadata = FeaturedPackMetadata(),
+    val tracks: List<Track> = emptyList(),
+    val programsByTrackId: Map<Long, FeaturedTrackProgram> = emptyMap(),
+    /** Publisher-facing, local-only content summary calculated during the asset scan. */
+    val health: FeaturedTopicHealth = FeaturedTopicHealth()
+)
+
+data class FeaturedTopicHealth(
+    val trackCount: Int = 0,
+    val resolvedDurationCount: Int = 0,
+    val chapterCount: Int = 0,
+    val noteCount: Int = 0,
+    val hasCustomCover: Boolean = false,
+    val hasPackConfiguration: Boolean = false,
+    val hasExplicitStableId: Boolean = false
+) {
+    val contentSummary: String
+        get() = T("%1\$s 首音频 · %2\$s 首已识别时长 · %3\$s 个章节").format(trackCount, resolvedDurationCount, chapterCount)
+}
+
+/** Optional, publisher-authored context for one featured asset. */
+data class FeaturedTrackProgram(
+    val chapters: List<FeaturedChapter> = emptyList(),
+    val notes: List<String> = emptyList()
+) {
+    val hasContent: Boolean
+        get() = chapters.isNotEmpty() || notes.isNotEmpty()
+}
+
+data class FeaturedChapter(
+    val timestampMs: Long,
+    val title: String
+)
+
+data class ChapterPlaybackState(
+    val activeChapter: FeaturedChapter?,
+    val activeIndex: Int,
+    val completedCount: Int,
+    val previousChapter: FeaturedChapter?,
+    val nextChapter: FeaturedChapter?,
+    val chapterProgress: Float,
+    val remainingInChapterMs: Long?
+) {
+    val isTransitionImminent: Boolean
+        get() = nextChapter != null && (remainingInChapterMs ?: Long.MAX_VALUE) in 0L..20_000L
+}
+
+fun FeaturedTrackProgram.chapterPlaybackState(positionMs: Long, durationMs: Long): ChapterPlaybackState {
+    val position = positionMs.coerceAtLeast(0L)
+    val activeIndex = chapters.indexOfLast { it.timestampMs <= position }
+    val activeChapter = chapters.getOrNull(activeIndex)
+    val previousChapter = chapters.getOrNull(activeIndex - 1)
+    val nextChapter = chapters.getOrNull(activeIndex + 1)
+    val chapterEndMs = nextChapter?.timestampMs
+        ?: durationMs.takeIf { it > (activeChapter?.timestampMs ?: 0L) }
+    val chapterDurationMs = activeChapter?.let { chapter -> chapterEndMs?.minus(chapter.timestampMs) }
+    val chapterProgress = if (activeChapter != null && chapterDurationMs != null && chapterDurationMs > 0L) {
+        ((position - activeChapter.timestampMs).toFloat() / chapterDurationMs.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+    return ChapterPlaybackState(
+        activeChapter = activeChapter,
+        activeIndex = activeIndex,
+        completedCount = activeIndex.coerceAtLeast(0),
+        previousChapter = previousChapter,
+        nextChapter = nextChapter,
+        chapterProgress = chapterProgress,
+        remainingInChapterMs = chapterEndMs?.minus(position)?.coerceAtLeast(0L)
+    )
+}
+
+data class FeaturedPackMetadata(
+    val title: String = T("本期专题音频"),
+    val eyebrow: String = "MUSE · FEATURED",
+    val description: String = T(T("随应用附带的专题声音内容。")),
+    val defaultArtist: String = T("精选内容"),
+    val defaultAlbum: String = T("专题音频包"),
+    val playLabel: String = T("从头播放"),
+    /** Optional publisher identity for this pack, for example T("城市夜行 · Vol. 01"). */
+    val identityLabel: String? = null,
+    /** Optional edition or update label, for example T("2026 夏季修订版"). */
+    val editionLabel: String? = null,
+    /** Optional first-listen guide shown on the home screen. */
+    val listeningGuide: String? = null,
+    /** Optional image asset path configured by pack.json, for example featured_audio/cover.webp. */
+    val coverAssetPath: String? = null,
+    /** Optional ascending ordering for packs in featured_audio/topics. */
+    val sortOrder: Int = 0
+)

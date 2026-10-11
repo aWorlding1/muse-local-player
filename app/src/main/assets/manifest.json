@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "_说明": "光栖音乐内容配置。内置音频按 series 声明的文件夹自动发现；items 为可选轨道元数据覆盖。",
+  "collection": {
+    "title": "本期专题音频",
+    "subtitle": "MUSE · FEATURED",
+    "description": "随应用附带的专题声音内容。",
+    "version": "Starter Pack · 2026",
+    "defaultArtist": "精选内容",
+    "defaultAlbum": "专题音频包",
+    "playLabel": "从头播放"
+  },
+
+  "series": {
+    "featured_audio": {
+      "title": "本期专题音频",
+      "description": "随应用附带的专题声音内容",
+      "tags": ["精选"],
+      "order": 1
+    }
+  },
+
+  "items": []
+}

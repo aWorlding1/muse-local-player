@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Muse Local Music</string>
+    <string name="playback_notification_channel">Muse playback</string>
+    <string name="playback_notification_description">Shows the current track and provides lock screen and notification controls.</string>
+    <string name="playback_notification_fallback">Playing local music</string>
+</resources>

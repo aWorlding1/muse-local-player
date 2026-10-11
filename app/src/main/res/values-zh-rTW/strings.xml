@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Muse 本機音樂</string>
+    <string name="playback_notification_channel">Muse 音樂播放</string>
+    <string name="playback_notification_description">顯示正在播放的歌曲並提供鎖定畫面與通知列控制。</string>
+    <string name="playback_notification_fallback">本機音樂播放中</string>
+</resources>
